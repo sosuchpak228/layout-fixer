@@ -111,7 +111,10 @@ mod tests {
         assert_eq!(convert("HF,JNFTN", Direction::Auto, true), "работает");
         assert_eq!(convert("Привет", Direction::Auto, false), "Ghbdtn");
         assert_eq!(convert("ПРИВЕТ", Direction::Auto, false), "GHBDTN");
-        assert_eq!(convert("Ghbdtn, Vbh", Direction::Auto, false), "Приветб Мир");
+        assert_eq!(
+            convert("Ghbdtn, Vbh", Direction::Auto, false),
+            "Приветб Мир"
+        );
         assert_eq!(convert("Hf,Jnftn", Direction::Auto, false), "РабОтает");
     }
 

@@ -17,15 +17,18 @@ jobs:
         run: |
           rustup toolchain install 1.98.0 --profile minimal
           rustup component add --toolchain 1.98.0 clippy rustfmt
-      - name: Verify
-        run: |
-          cargo +1.98.0 fmt --all -- --check
-          cargo +1.98.0 test --locked
-          cargo +1.98.0 clippy --all-targets --locked -- -D warnings
+      - name: Format
+        run: cargo +1.98.0 fmt --all -- --check
+      - name: Test
+        run: cargo +1.98.0 test --locked
+      - name: Lint
+        run: cargo +1.98.0 clippy --all-targets --locked -- -D warnings
+      - name: Build
+        run: cargo +1.98.0 build --release --locked
       - name: Package
         shell: pwsh
         run: |
-          cargo +1.98.0 build --release --locked
+          $ErrorActionPreference = 'Stop'
           Copy-Item target/release/layout-fixer.exe layout-fixer.exe
           Compress-Archive -Path layout-fixer.exe,LICENSE,README.md -DestinationPath layout-fixer-windows-x64.zip
           @('layout-fixer.exe', 'layout-fixer-windows-x64.zip') | ForEach-Object {

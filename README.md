@@ -1,6 +1,6 @@
 # Layout Fixer
 
-[![Download for Windows x64](https://img.shields.io/badge/Download-Windows%20x64-0078D4?logo=windows)](https://github.com/sosuchpak228/layout-fixer/releases/download/v0.1.0-preview.1/layout-fixer.exe)
+[![Download for Windows x64](https://img.shields.io/badge/Download-Windows%20x64-0078D4?logo=windows)](https://github.com/sosuchpak228/layout-fixer/releases/download/v0.1.0-preview.2/layout-fixer.exe)
 
 A small, local Windows tool for correcting text typed in the wrong English/Russian keyboard layout. Select text and press **Ctrl+Alt+L**. For example, `ghbdtn` becomes `привет`, and `руддщ` becomes `hello`.
 
