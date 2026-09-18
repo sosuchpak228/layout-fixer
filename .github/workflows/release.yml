@@ -1,0 +1,39 @@
+name: Windows preview release
+
+on:
+  push:
+    tags:
+      - 'v*-preview.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.98
+        run: |
+          rustup toolchain install 1.98.0 --profile minimal
+          rustup component add --toolchain 1.98.0 clippy rustfmt
+      - name: Verify
+        run: |
+          cargo +1.98.0 fmt --all -- --check
+          cargo +1.98.0 test --locked
+          cargo +1.98.0 clippy --all-targets --locked -- -D warnings
+      - name: Package
+        shell: pwsh
+        run: |
+          cargo +1.98.0 build --release --locked
+          Copy-Item target/release/layout-fixer.exe layout-fixer.exe
+          Compress-Archive -Path layout-fixer.exe,LICENSE,README.md -DestinationPath layout-fixer-windows-x64.zip
+          @('layout-fixer.exe', 'layout-fixer-windows-x64.zip') | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant(), $_
+          } | Set-Content -Encoding ascii SHA256SUMS.txt
+      - name: Publish pre-release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create $env:TAG layout-fixer.exe layout-fixer-windows-x64.zip SHA256SUMS.txt --prerelease --verify-tag --title "Layout Fixer $env:TAG" --notes "Windows x64 portable preview. Unsigned executable; review README and verify SHA-256 before running."
