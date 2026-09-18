@@ -1,36 +1,55 @@
 # Layout Fixer
 
-[![Download for Windows x64](https://img.shields.io/badge/Download-Windows%20x64-0078D4?logo=windows)](https://github.com/sosuchpak228/layout-fixer/releases/download/v0.1.0-preview.2/layout-fixer.exe)
+[English](README.en.md)
 
-A small, local Windows tool for correcting text typed in the wrong English/Russian keyboard layout. Select text and press **Ctrl+Alt+L**. For example, `ghbdtn` becomes `привет`, and `руддщ` becomes `hello`.
+[![Скачать для Windows x64](https://img.shields.io/badge/Download-Windows%20x64-0078D4?logo=windows)](https://github.com/sosuchpak228/layout-fixer/releases/download/v0.1.0-preview.3/layout-fixer.exe)
 
-This version **never copies selected text to the clipboard**. It reads the selection through Windows UI Automation or a standard Win32 `Edit` control, then replaces it with Unicode keyboard input. If an editor exposes neither interface, the tool leaves the text unchanged.
+Небольшая утилита для Windows, которая исправляет текст, набранный в неверной русской или английской раскладке. Выделите текст и нажмите **Ctrl+Alt+L**: `ghbdtn` станет `привет`, а `руддщ` — `hello`. Регистр сохраняется: `Ghbdtn` → `Привет`, `HF,JNFTN` → `РАБОТАЕТ`.
 
-## Use
+Программа **не копирует выделенный текст в буфер обмена**, не добавляет его в историю Win+V и ничего не отправляет в сеть. Она читает выделение через Windows UI Automation или обычное поле Win32 `Edit` и заменяет его вводом Unicode. Если редактор не поддерживает такой способ чтения, текст останется без изменений.
 
-1. Use the download button above, or get the EXE/ZIP from [Releases](https://github.com/sosuchpak228/layout-fixer/releases). Keep the EXE in a permanent folder if you plan to add it to startup.
-2. Run `layout-fixer.exe`. It lives in the notification area; right-click its icon to exit. As an unsigned preview, it may show a Windows SmartScreen warning; check the source and SHA-256 before choosing to run it.
-3. Select text in an editable field and press **Ctrl+Alt+L**.
+## Скачать и запустить
 
-This is a portable preview, not an installer. No administrator privileges, network connection, service, clipboard access, or automatic startup is required. Letter case is preserved by default: `Ghbdtn` becomes `Привет`, `GHBDTN` becomes `ПРИВЕТ`, and `HF,JNFTN` becomes `РАБОТАЕТ`. Use `--lowercase` only if you prefer the old all-lowercase behavior.
+1. Нажмите кнопку **Download Windows x64** выше и скачайте `layout-fixer.exe` из [последнего preview-релиза](https://github.com/sosuchpak228/layout-fixer/releases). ZIP распаковывать не нужно.
+2. Переместите EXE в постоянную папку, если собираетесь пользоваться программой регулярно. Запустите файл без прав администратора.
+3. Значок появится в области уведомлений Windows. Выделите текст в редактируемом поле и нажмите **Ctrl+Alt+L**. Для выхода нажмите правой кнопкой мыши на значке и выберите **Exit Layout Fixer**.
 
-To try it alongside another layout tool, run `layout-fixer.exe --test-hotkey` and use **Ctrl+Alt+F12**. The normal hotkey can only belong to one application at a time. The application does not silently stop or reconfigure other layout tools.
+Это **переносимая предварительная версия**, а не установщик: она не создаёт службу, не меняет реестр и не добавляет себя в автозапуск. Файл пока не подписан цифровой подписью, поэтому Windows может показать предупреждение SmartScreen. Перед запуском проверьте адрес репозитория и при необходимости сравните SHA-256 с файлом `SHA256SUMS.txt` на странице релиза.
 
-To start it on sign-in, first make sure it works in your editors, then place a shortcut to the EXE in your own Windows Startup folder (`shell:startup`). Remove that shortcut to undo startup. Do not enable both this tool and another `Ctrl+Alt+L` listener on startup.
+### Если Ctrl+Alt+L уже занят
 
-## Compatibility
+Не запускайте два слушателя на одном сочетании. Для проверки рядом с существующей утилитой запустите EXE с аргументом `--test-hotkey` и используйте **Ctrl+Alt+F12**. Откройте PowerShell в папке с EXE и выполните:
 
-- Verified on Windows 10 with the classic Notepad `Edit` field in both directions.
-- UI Automation `TextPattern` works only in applications that expose an editable text selection through it. Chrome, Telegram, Unreal Editor, terminal emulators, and remote desktops are **not yet verified** for this new path.
-- Does not interact with password fields, read-only selections, unsupported/custom editor controls, elevated windows, protected desktops, or games that reject synthetic Unicode input. It intentionally has no clipboard fallback.
-- A foreground-window change or multiple/disappearing selections aborts replacement. Selection is capped at 16,384 UTF-16 units. Standard `Edit` fallback also requires the selection to end within the first 16,384 units of the control.
-- No selected text or clipboard content is saved to a log or sent over the network. The tray icon uses a stock Windows icon.
+```powershell
+Start-Process -FilePath .\layout-fixer.exe -ArgumentList '--test-hotkey'
+```
 
-If the hotkey does nothing in your editor, open an issue with the Windows version, app/version, whether the control is elevated, and reproduction steps. **Never include the selected text, screenshots of private content, or credentials.** This is an early public preview, not a universal replacement for every editor.
+Параметр `--lowercase` переводит весь результат в строчные буквы вместо сохранения регистра.
 
-## Build
+### Автозапуск и удаление
 
-On Windows with the Rust 1.98 MSVC toolchain:
+Сначала убедитесь, что программа работает в ваших редакторах. Затем нажмите **Win+R**, введите `shell:startup` и положите в открывшуюся папку ярлык на EXE. Перед этим уберите из автозапуска другой слушатель **Ctrl+Alt+L**, если он есть. Чтобы удалить утилиту, выйдите через значок, удалите ярлык из автозапуска и сам EXE. Драйверов и системных служб нет.
+
+## Что лежит в релизе
+
+- `layout-fixer.exe` — готовая переносимая программа. Это основной файл для скачивания.
+- `layout-fixer-windows-x64.zip` — тот же EXE вместе с README и лицензией, если удобнее архив.
+- `SHA256SUMS.txt` — контрольные суммы файлов сборки.
+- `Source code (zip)` и `Source code (tar.gz)` — автоматически созданные GitHub архивы **исходного кода**, не установщики.
+
+Код можно читать прямо на сайте: вкладка [Code](https://github.com/sosuchpak228/layout-fixer) и папка [src](https://github.com/sosuchpak228/layout-fixer/tree/main/src). Ядро преобразования — `src/lib.rs`, работа с выделением — `src/main.rs`, значок — `src/tray.rs`. Для просмотра кода конкретного выпуска откройте его тег на странице релиза.
+
+## Ограничения
+
+- Проверена работа с обычным полем `Edit` в Блокноте Windows 10 в обе стороны. Chrome, Telegram, Unreal Editor, терминалы и удалённые рабочие столы для нового способа чтения выделения пока не проверены.
+- Поля паролей, элементы только для чтения, неподдерживаемые редакторы, окна с повышенными правами и защищённый рабочий стол не обрабатываются. Нет запасного способа через буфер обмена.
+- Выделение ограничено 16 384 единицами UTF-16. При смене активного окна или неоднозначном выделении программа ничего не заменит.
+
+Если в вашем редакторе сочетание не работает, [создайте issue](https://github.com/sosuchpak228/layout-fixer/issues) с версией Windows и приложения и шагами воспроизведения. **Не прикладывайте приватный текст, пароли и скриншоты с личными данными.**
+
+## Сборка из исходников
+
+Нужны Windows и Rust 1.98 с MSVC toolchain:
 
 ```powershell
 cargo test --locked
@@ -38,12 +57,4 @@ cargo clippy --all-targets --locked -- -D warnings
 cargo build --release --locked
 ```
 
-The portable executable is `target/release/layout-fixer.exe`. The pure EN/RU mapping lives in `src/lib.rs`; OS selection and input are in `src/main.rs`, and the notification icon is in `src/tray.rs`.
-
-## Safety and limitations
-
-The tool does not hook keystrokes globally: `RegisterHotKey` only notifies it when its own shortcut is pressed. It reads only the current selection at that moment. Windows UI Automation is not supported uniformly by editors, and `SendInput` cannot cross Windows integrity boundaries. It does not switch your actual keyboard language or install a driver. See [design notes](docs/design.md) for the tradeoffs and test plan.
-
-## License
-
-MIT, see [LICENSE](LICENSE).
+Результат: `target/release/layout-fixer.exe`. Детали и план проверки — в [дизайн-заметках](docs/design.md). Лицензия — [MIT](LICENSE).

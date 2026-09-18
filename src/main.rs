@@ -274,7 +274,7 @@ fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--help" || a == "-h") {
         println!(
-            "Layout Fixer 0.1.0-preview.2\n  (no arguments)      Listen on Ctrl+Alt+L in the tray; preserve letter case\n  --test-hotkey        Listen on Ctrl+Alt+F12 alongside an existing fixer\n  --lowercase          Convert all output to lowercase\n  --help               Show this message\nNo clipboard access, network, service, or autorun."
+            "Layout Fixer 0.1.0-preview.3\n  (no arguments)      Listen on Ctrl+Alt+L in the tray; preserve letter case\n  --test-hotkey        Listen on Ctrl+Alt+F12 alongside an existing fixer\n  --lowercase          Convert all output to lowercase\n  --help               Show this message\nNo clipboard access, network, service, or autorun."
         );
         return;
     }

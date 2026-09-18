@@ -39,4 +39,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        run: gh release create $env:TAG layout-fixer.exe layout-fixer-windows-x64.zip SHA256SUMS.txt --prerelease --verify-tag --title "Layout Fixer $env:TAG" --notes "Windows x64 portable preview. Unsigned executable; review README and verify SHA-256 before running."
+        run: gh release create $env:TAG layout-fixer.exe layout-fixer-windows-x64.zip SHA256SUMS.txt --prerelease --verify-tag --title "Layout Fixer $env:TAG" --notes-file RELEASE_NOTES.md
