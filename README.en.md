@@ -2,7 +2,7 @@
 
 [Русская версия](README.md)
 
-[![Download for Windows x64](https://img.shields.io/badge/Download-Windows%20x64-0078D4?logo=windows)](https://github.com/sosuchpak228/layout-fixer/releases/download/v0.1.0-preview.3/layout-fixer.exe)
+[![Download for Windows x64](https://img.shields.io/badge/Download-Windows%20x64-0078D4?logo=windows)](https://github.com/sosuchpak228/layout-fixer/releases/download/v0.1.0-preview.4/layout-fixer.exe)
 
 A small, local Windows tool for correcting text typed in the wrong English/Russian keyboard layout. Select text and press **Ctrl+Alt+L**. For example, `ghbdtn` becomes `привет`, and `руддщ` becomes `hello`.
 
@@ -18,7 +18,23 @@ This is a portable preview, not an installer. No administrator privileges, netwo
 
 To try it alongside another layout tool, run `layout-fixer.exe --test-hotkey` and use **Ctrl+Alt+F12**. The normal hotkey can only belong to one application at a time. The application does not silently stop or reconfigure other layout tools.
 
-To start it on sign-in, first make sure it works in your editors, then place a shortcut to the EXE in your own Windows Startup folder (`shell:startup`). Remove that shortcut to undo startup. Do not enable both this tool and another `Ctrl+Alt+L` listener on startup.
+To use a custom shortcut, pass `--hotkey` followed by a combination, for example:
+
+```powershell
+Start-Process -FilePath .\layout-fixer.exe -ArgumentList '--hotkey', 'Ctrl+Alt+A'
+```
+
+Supported modifiers are `Ctrl`, `Alt`, `Shift`, and `Win`; supported keys are `A-Z`, `0-9`, and `F1-F24`. At least one modifier is required. If Windows or another application owns the combination, Layout Fixer shows an error and exits.
+
+For a persistent custom shortcut, create a Windows shortcut to the EXE and append the arguments after the closing quote in its **Target** field:
+
+```text
+"C:\Tools\Layout Fixer\layout-fixer.exe" --hotkey Ctrl+Alt+A
+```
+
+Run that shortcut to test it, then move it to `shell:startup` if desired. The tray tooltip displays the active combination.
+
+To start it on sign-in, first make sure it works in your editors, then place the tested shortcut in your own Windows Startup folder (`shell:startup`). Remove that shortcut to undo startup. Do not enable two listeners with the same hotkey.
 
 ## Compatibility
 

@@ -2,11 +2,12 @@
 
 ## Contract
 
-Input: one non-empty text selection in an editable window, followed by Ctrl+Alt+L. Output: replace the selection with a physical EN/RU key-map conversion, preserving letter case by default. Punctuation keys that become letters within an all-caps word inherit that word's case. `--lowercase` is an opt-in alternative. No selection, ambiguous ranges, unsupported editor, password field, foreground change, or too-long selection: do nothing.
+Input: one non-empty text selection in an editable window, followed by the registered hotkey (Ctrl+Alt+L by default). Output: replace the selection with a physical EN/RU key-map conversion, preserving letter case by default. Punctuation keys that become letters within an all-caps word inherit that word's case. `--lowercase` is an opt-in alternative. No selection, ambiguous ranges, unsupported editor, password field, foreground change, or too-long selection: do nothing.
 
 ## Why these APIs
 
 - `RegisterHotKey`, not a global low-level keyboard hook: only one shortcut is observed, no background keystroke collection.
+- `--hotkey` accepts a constrained, auditable grammar: one or more of Ctrl/Alt/Shift/Win plus exactly one A-Z, 0-9, or F1-F24 key. Requiring a modifier prevents accidental capture of an ordinary typing key.
 - UI Automation `TextPattern.GetSelection` plus `TextRange.GetText`: reads supported editors without changing shared clipboard state.
 - Narrow Win32 `Edit` fallback: `EM_GETSEL` and `WM_GETTEXT` with a 500 ms timeout, restricted to the focused child control of the foreground window. Classic Notepad does not expose UIA TextPattern on this host.
 - `SendInput` with `KEYEVENTF_UNICODE`: replaces the active selection without a paste operation. It is not guaranteed to work in every editor or across an elevated/secure desktop boundary.

@@ -117,7 +117,7 @@ impl Tray {
         for (target, unit) in icon
             .szTip
             .iter_mut()
-            .zip(format!("Layout Fixer: Ctrl+Alt+{hotkey}").encode_utf16())
+            .zip(format!("Layout Fixer: {hotkey}").encode_utf16())
         {
             *target = unit;
         }

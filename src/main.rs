@@ -2,7 +2,7 @@
 
 use std::{mem::size_of, thread, time::Duration};
 
-use layout_fixer::{Direction, convert};
+use layout_fixer::{Direction, HotkeySpec, convert};
 mod tray;
 use windows::Win32::{
     Foundation::{HWND, LPARAM, WPARAM},
@@ -18,9 +18,10 @@ use windows::Win32::{
         },
         Controls::EM_GETSEL,
         Input::KeyboardAndMouse::{
-            GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
-            KEYEVENTF_UNICODE, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, RegisterHotKey, SendInput,
-            UnregisterHotKey, VK_CONTROL, VK_F12, VK_L, VK_MENU,
+            GetAsyncKeyState, HOT_KEY_MODIFIERS, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT,
+            KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT,
+            MOD_WIN, RegisterHotKey, SendInput, UnregisterHotKey, VK_CONTROL, VK_LWIN, VK_MENU,
+            VK_RWIN, VK_SHIFT,
         },
         WindowsAndMessaging::{
             ES_PASSWORD, ES_READONLY, GWL_STYLE, GetClassNameW, GetForegroundWindow, GetMessageW,
@@ -159,7 +160,11 @@ fn selection(
 fn modifiers_released() -> bool {
     for _ in 0..120 {
         let down = unsafe {
-            GetAsyncKeyState(VK_CONTROL.0 as i32) < 0 || GetAsyncKeyState(VK_MENU.0 as i32) < 0
+            GetAsyncKeyState(VK_CONTROL.0 as i32) < 0
+                || GetAsyncKeyState(VK_MENU.0 as i32) < 0
+                || GetAsyncKeyState(VK_SHIFT.0 as i32) < 0
+                || GetAsyncKeyState(VK_LWIN.0 as i32) < 0
+                || GetAsyncKeyState(VK_RWIN.0 as i32) < 0
         };
         if !down {
             return true;
@@ -210,7 +215,7 @@ fn replace_selection(text: &str) -> Result<(), String> {
 fn on_hotkey(ui: &IUIAutomation, lowercase: bool) -> Result<&'static str, String> {
     let foreground = unsafe { GetForegroundWindow() };
     if !modifiers_released() {
-        return Err("release Ctrl and Alt, then retry".to_string());
+        return Err("release the hotkey modifiers, then retry".to_string());
     }
     let (source, method) = match selection(ui, foreground)? {
         Some(value) => value,
@@ -231,7 +236,24 @@ fn on_hotkey(ui: &IUIAutomation, lowercase: bool) -> Result<&'static str, String
     })
 }
 
-fn run(hotkey: u32, lowercase: bool) -> Result<(), String> {
+fn hotkey_modifiers(hotkey: &HotkeySpec) -> HOT_KEY_MODIFIERS {
+    let mut modifiers = MOD_NOREPEAT;
+    if hotkey.ctrl {
+        modifiers |= MOD_CONTROL;
+    }
+    if hotkey.alt {
+        modifiers |= MOD_ALT;
+    }
+    if hotkey.shift {
+        modifiers |= MOD_SHIFT;
+    }
+    if hotkey.win {
+        modifiers |= MOD_WIN;
+    }
+    modifiers
+}
+
+fn run(hotkey: &HotkeySpec, lowercase: bool) -> Result<(), String> {
     unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }
         .ok()
         .map_err(|e| format!("COM initialization: {e}"))?;
@@ -239,21 +261,22 @@ fn run(hotkey: u32, lowercase: bool) -> Result<(), String> {
         let ui: IUIAutomation =
             unsafe { CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER) }
                 .map_err(|e| format!("UI Automation: {e}"))?;
-        let hotkey_name = if hotkey == VK_L.0 as u32 { "L" } else { "F12" };
-        let tray = tray::Tray::new(hotkey_name)?;
+        let tray = tray::Tray::new(&hotkey.label)?;
         unsafe {
             RegisterHotKey(
                 Some(tray.window()),
                 HOTKEY_ID,
-                MOD_CONTROL | MOD_ALT | MOD_NOREPEAT,
-                hotkey,
+                hotkey_modifiers(hotkey),
+                hotkey.key,
             )
         }
-        .map_err(|e| format!("hotkey unavailable (another app may own it): {e}"))?;
-        println!(
-            "Ready: Ctrl+Alt+{}. Press Ctrl+C here to stop.",
-            hotkey_name
-        );
+        .map_err(|e| {
+            format!(
+                "{} is unavailable; another app or Windows may own it: {e}",
+                hotkey.label
+            )
+        })?;
+        println!("Ready: {}. Press Ctrl+C here to stop.", hotkey.label);
         let mut msg = MSG::default();
         while unsafe { GetMessageW(&mut msg, None, 0, 0) }.as_bool() {
             if msg.message == WM_HOTKEY && msg.wParam.0 == HOTKEY_ID as usize {
@@ -274,34 +297,62 @@ fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--help" || a == "-h") {
         println!(
-            "Layout Fixer 0.1.0-preview.3\n  (no arguments)      Listen on Ctrl+Alt+L in the tray; preserve letter case\n  --test-hotkey        Listen on Ctrl+Alt+F12 alongside an existing fixer\n  --lowercase          Convert all output to lowercase\n  --help               Show this message\nNo clipboard access, network, service, or autorun."
+            "Layout Fixer 0.1.0-preview.4\n  (no arguments)       Listen on Ctrl+Alt+L in the tray; preserve letter case\n  --hotkey COMBINATION Use a custom shortcut, e.g. --hotkey Ctrl+Alt+A\n  --test-hotkey         Alias for --hotkey Ctrl+Alt+F12\n  --lowercase           Convert all output to lowercase\n  --help                Show this message\nSupported keys: A-Z, 0-9, F1-F24. Include Ctrl, Alt, Shift, or Win."
         );
         return;
     }
-    if args
-        .iter()
-        .any(|a| a != "--test-hotkey" && a != "--lowercase")
-    {
-        eprintln!("Unknown argument; see --help.");
-        std::process::exit(2);
-    }
-    let hotkey = if args.iter().any(|a| a == "--test-hotkey") {
-        VK_F12.0
-    } else {
-        VK_L.0
-    };
-    if let Err(error) = run(hotkey as u32, args.iter().any(|a| a == "--lowercase")) {
-        eprintln!("Layout Fixer: {error}");
-        if !args.iter().any(|a| a == "--test-hotkey") {
-            unsafe {
-                MessageBoxW(
-                    None,
-                    &HSTRING::from(error),
-                    w!("Layout Fixer"),
-                    MB_OK | MB_ICONERROR,
-                );
+    let mut hotkey_value = None;
+    let mut test_hotkey = false;
+    let mut lowercase = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--test-hotkey" => test_hotkey = true,
+            "--lowercase" => lowercase = true,
+            "--hotkey" => {
+                if hotkey_value.is_some() {
+                    show_startup_error("--hotkey may only be specified once");
+                }
+                index += 1;
+                if index == args.len() {
+                    show_startup_error("--hotkey requires a combination such as Ctrl+Alt+A");
+                }
+                hotkey_value = Some(args[index].clone());
             }
+            value if value.starts_with("--hotkey=") => {
+                if hotkey_value.is_some() {
+                    show_startup_error("--hotkey may only be specified once");
+                }
+                hotkey_value = Some(value["--hotkey=".len()..].to_string());
+            }
+            value => show_startup_error(&format!("Unknown argument: {value}")),
         }
-        std::process::exit(1);
+        index += 1;
     }
+    if test_hotkey && hotkey_value.is_some() {
+        show_startup_error("Use either --test-hotkey or --hotkey, not both");
+    }
+    let hotkey_value = if test_hotkey {
+        "Ctrl+Alt+F12"
+    } else {
+        hotkey_value.as_deref().unwrap_or("Ctrl+Alt+L")
+    };
+    let hotkey = HotkeySpec::parse(hotkey_value).unwrap_or_else(|error| show_startup_error(&error));
+    if let Err(error) = run(&hotkey, lowercase) {
+        eprintln!("Layout Fixer: {error}");
+        show_startup_error(&error);
+    }
+}
+
+fn show_startup_error(error: &str) -> ! {
+    unsafe {
+        MessageBoxW(
+            None,
+            &HSTRING::from(error),
+            w!("Layout Fixer"),
+            MB_OK | MB_ICONERROR,
+        );
+    }
+    eprintln!("Layout Fixer: {error}");
+    std::process::exit(2);
 }

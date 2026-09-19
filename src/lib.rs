@@ -7,6 +7,94 @@ pub enum Direction {
     RuToEn,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HotkeySpec {
+    pub ctrl: bool,
+    pub alt: bool,
+    pub shift: bool,
+    pub win: bool,
+    pub key: u32,
+    pub label: String,
+}
+
+impl HotkeySpec {
+    pub fn parse(value: &str) -> Result<Self, String> {
+        let mut ctrl = false;
+        let mut alt = false;
+        let mut shift = false;
+        let mut win = false;
+        let mut key = None;
+        let mut key_label = None;
+
+        for raw_part in value.split('+') {
+            let part = raw_part.trim().to_ascii_uppercase();
+            if part.is_empty() {
+                return Err("hotkey contains an empty part".to_string());
+            }
+            match part.as_str() {
+                "CTRL" | "CONTROL" if !ctrl => ctrl = true,
+                "ALT" if !alt => alt = true,
+                "SHIFT" if !shift => shift = true,
+                "WIN" | "WINDOWS" if !win => win = true,
+                "CTRL" | "CONTROL" | "ALT" | "SHIFT" | "WIN" | "WINDOWS" => {
+                    return Err(format!("duplicate hotkey modifier: {raw_part}"));
+                }
+                _ if key.is_some() => {
+                    return Err("hotkey must contain exactly one regular key".to_string());
+                }
+                _ => {
+                    let parsed = if part.len() == 1 {
+                        let ch = part.as_bytes()[0];
+                        if ch.is_ascii_uppercase() || ch.is_ascii_digit() {
+                            Some(ch as u32)
+                        } else {
+                            None
+                        }
+                    } else if let Some(number) = part.strip_prefix('F') {
+                        number
+                            .parse::<u32>()
+                            .ok()
+                            .filter(|number| (1..=24).contains(number))
+                            .map(|number| 0x70 + number - 1)
+                    } else {
+                        None
+                    };
+                    key = Some(parsed.ok_or_else(|| {
+                        format!("unsupported hotkey key: {raw_part}; use A-Z, 0-9, or F1-F24")
+                    })?);
+                    key_label = Some(part);
+                }
+            }
+        }
+        if !(ctrl || alt || shift || win) {
+            return Err("hotkey must include Ctrl, Alt, Shift, or Win".to_string());
+        }
+        let key = key.ok_or_else(|| "hotkey is missing its regular key".to_string())?;
+        let mut labels = Vec::new();
+        if ctrl {
+            labels.push("Ctrl".to_string());
+        }
+        if alt {
+            labels.push("Alt".to_string());
+        }
+        if shift {
+            labels.push("Shift".to_string());
+        }
+        if win {
+            labels.push("Win".to_string());
+        }
+        labels.push(key_label.expect("a parsed key always has a label"));
+        Ok(Self {
+            ctrl,
+            alt,
+            shift,
+            win,
+            key,
+            label: labels.join("+"),
+        })
+    }
+}
+
 const EN_LOWER: &str = "`qwertyuiop[]asdfghjkl;'zxcvbnm,./";
 const EN_UPPER: &str = "~QWERTYUIOP{}ASDFGHJKL:\"ZXCVBNM<>?";
 const EN_SHIFT: &str = "!@#$%^&*()_+";
@@ -125,5 +213,35 @@ mod tests {
             convert("abc\r\ndef", Direction::EnToRu, false),
             "фис\r\nвуа"
         );
+    }
+
+    #[test]
+    fn parses_supported_hotkeys() {
+        assert_eq!(
+            HotkeySpec::parse("ctrl+alt+a").unwrap(),
+            HotkeySpec {
+                ctrl: true,
+                alt: true,
+                shift: false,
+                win: false,
+                key: b'A' as u32,
+                label: "Ctrl+Alt+A".to_string(),
+            }
+        );
+        assert_eq!(
+            HotkeySpec::parse("Shift + Win + F24").unwrap().label,
+            "Shift+Win+F24"
+        );
+        assert_eq!(HotkeySpec::parse("Alt+0").unwrap().key, b'0' as u32);
+    }
+
+    #[test]
+    fn rejects_unsafe_or_ambiguous_hotkeys() {
+        assert!(HotkeySpec::parse("A").is_err());
+        assert!(HotkeySpec::parse("Ctrl+Alt").is_err());
+        assert!(HotkeySpec::parse("Ctrl+Ctrl+A").is_err());
+        assert!(HotkeySpec::parse("Ctrl+A+B").is_err());
+        assert!(HotkeySpec::parse("Ctrl+F25").is_err());
+        assert!(HotkeySpec::parse("Ctrl+Delete").is_err());
     }
 }
