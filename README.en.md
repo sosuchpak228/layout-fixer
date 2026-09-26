@@ -2,7 +2,7 @@
 
 [Русская версия](README.md)
 
-[![Download for Windows x64](https://img.shields.io/badge/Download-Windows%20x64-0078D4?logo=windows)](https://github.com/sosuchpak228/layout-fixer/releases/download/v0.1.0-preview.5/layout-fixer.exe)
+[![Download for Windows x64](https://img.shields.io/badge/Download-Windows%20x64-0078D4?logo=windows)](https://github.com/sosuchpak228/layout-fixer/releases/download/v0.1.0-preview.6/layout-fixer.exe)
 
 A small, local Windows tool for correcting text typed in the wrong English/Russian keyboard layout. Select text and press **Ctrl+Alt+L**. For example, `ghbdtn` becomes `привет`, and `руддщ` becomes `hello`.
 
@@ -10,11 +10,11 @@ This version **never copies selected text to the clipboard**. It reads the selec
 
 ## Use
 
-1. Use the download button above, or get the EXE/ZIP from [Releases](https://github.com/sosuchpak228/layout-fixer/releases). Keep the EXE in a permanent folder if you plan to add it to startup.
-2. Run `layout-fixer.exe`. It lives in the notification area; right-click its icon to exit. As an unsigned preview, it may show a Windows SmartScreen warning; check the source and SHA-256 before choosing to run it.
-3. Select text in an editable field and press **Ctrl+Alt+L**.
+1. For a portable test, download `layout-fixer.exe` from [Releases](https://github.com/sosuchpak228/layout-fixer/releases) and run it.
+2. For a full per-user installation, download the ZIP, extract it, and run `install.cmd`. It copies the tool to `%LOCALAPPDATA%\Programs\LayoutFixer`, adds current-user startup, and registers an entry in Windows installed apps.
+3. Select text in an editable field and press **Ctrl+Alt+L**. The tray menu has **Exit Layout Fixer** and **Uninstall Layout Fixer**. You can also uninstall it from **Settings → Apps → Installed apps**.
 
-This is a portable preview, not an installer. No administrator privileges, network connection, service, clipboard access, or automatic startup is required. Letter case is preserved by default: `Ghbdtn` becomes `Привет`, `GHBDTN` becomes `ПРИВЕТ`, and `HF,JNFTN` becomes `РАБОТАЕТ`. Use `--lowercase` only if you prefer the old all-lowercase behavior.
+The EXE is portable; the release ZIP also includes a per-user installer. No administrator privileges, network connection, service, or clipboard access is required. Letter case is preserved by default: `Ghbdtn` becomes `Привет`, `GHBDTN` becomes `ПРИВЕТ`, and `HF,JNFTN` becomes `РАБОТАЕТ`. Use `--lowercase` only if you prefer the old all-lowercase behavior.
 
 The source is under the [MIT license](LICENSE), which is separate from executable signing. The EXE is not Authenticode-signed yet; signing requires a trusted publisher certificate and does not guarantee immediate SmartScreen reputation.
 
@@ -36,7 +36,7 @@ For a persistent custom shortcut, create a Windows shortcut to the EXE and appen
 
 Run that shortcut to test it, then move it to `shell:startup` if desired. The tray tooltip displays the active combination.
 
-To start it on sign-in, first make sure it works in your editors, then place the tested shortcut in your own Windows Startup folder (`shell:startup`). Remove that shortcut to undo startup. Do not enable two listeners with the same hotkey.
+The portable mode does not change startup or the registry. The installer uses only the current user profile and does not require administrator privileges, a service, or a driver. Uninstall removes the installed EXE, its startup shortcut, and its app registration; it does not touch unrelated user files. Do not enable two listeners with the same hotkey.
 
 ## Compatibility
 

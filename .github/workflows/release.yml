@@ -30,7 +30,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           Copy-Item target/release/layout-fixer.exe layout-fixer.exe
-          Compress-Archive -Path layout-fixer.exe,LICENSE,README.md -DestinationPath layout-fixer-windows-x64.zip
+          Compress-Archive -Path layout-fixer.exe,install.cmd,install.ps1,uninstall.ps1,LICENSE,README.md -DestinationPath layout-fixer-windows-x64.zip
           @('layout-fixer.exe', 'layout-fixer-windows-x64.zip') | ForEach-Object {
             "{0}  {1}" -f (Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant(), $_
           } | Set-Content -Encoding ascii SHA256SUMS.txt

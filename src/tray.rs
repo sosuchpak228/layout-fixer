@@ -1,4 +1,6 @@
 use std::mem::size_of;
+use std::process::Command;
+use std::{env, os::windows::process::CommandExt, path::PathBuf};
 
 use windows::{
     Win32::{
@@ -11,10 +13,10 @@ use windows::{
             },
             WindowsAndMessaging::{
                 AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
-                DestroyWindow, GetCursorPos, IDI_APPLICATION, LoadIconW, MF_STRING,
+                DestroyWindow, GetCursorPos, IDI_APPLICATION, LoadIconW, MF_SEPARATOR, MF_STRING,
                 PostQuitMessage, RegisterClassW, SetForegroundWindow, TPM_RIGHTBUTTON,
                 TrackPopupMenu, WINDOW_EX_STYLE, WINDOW_STYLE, WM_APP, WM_COMMAND, WM_DESTROY,
-                WM_RBUTTONUP, WNDCLASSW,
+                WM_LBUTTONUP, WM_RBUTTONUP, WNDCLASSW,
             },
         },
     },
@@ -23,6 +25,68 @@ use windows::{
 
 const TRAY_MESSAGE: u32 = WM_APP + 1;
 const EXIT_ID: usize = 1;
+const UNINSTALL_ID: usize = 2;
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+fn uninstall_script() -> Option<PathBuf> {
+    env::current_exe()
+        .ok()?
+        .parent()
+        .map(|directory| directory.join("uninstall.ps1"))
+        .filter(|path| path.is_file())
+}
+
+fn show_menu(hwnd: HWND) {
+    if let Ok(menu) = unsafe { CreatePopupMenu() } {
+        unsafe {
+            let _ = AppendMenuW(menu, MF_STRING, EXIT_ID, w!("Exit Layout Fixer"));
+            let _ = AppendMenuW(menu, MF_SEPARATOR, 0, None);
+            let _ = AppendMenuW(menu, MF_STRING, UNINSTALL_ID, w!("Uninstall Layout Fixer"));
+            let mut point = POINT::default();
+            if GetCursorPos(&mut point).is_ok() {
+                let _ = SetForegroundWindow(hwnd);
+                let _ = TrackPopupMenu(menu, TPM_RIGHTBUTTON, point.x, point.y, None, hwnd, None);
+            }
+            let _ = DestroyMenu(menu);
+        }
+    }
+}
+
+fn start_uninstall(hwnd: HWND) {
+    let Some(script) = uninstall_script() else {
+        unsafe {
+            let _ = windows::Win32::UI::WindowsAndMessaging::MessageBoxW(
+                Some(hwnd),
+                w!(
+                    "The uninstaller is not present. Reinstall Layout Fixer from the release ZIP first."
+                ),
+                w!("Layout Fixer"),
+                windows::Win32::UI::WindowsAndMessaging::MB_OK
+                    | windows::Win32::UI::WindowsAndMessaging::MB_ICONINFORMATION,
+            );
+        }
+        return;
+    };
+    let process_id = std::process::id().to_string();
+    if Command::new("powershell.exe")
+        .args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            script.to_string_lossy().as_ref(),
+            "-ProcessId",
+            &process_id,
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .is_ok()
+    {
+        unsafe {
+            let _ = DestroyWindow(hwnd);
+        }
+    }
+}
 
 unsafe extern "system" fn window_proc(
     hwnd: HWND,
@@ -31,32 +95,18 @@ unsafe extern "system" fn window_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     match msg {
-        TRAY_MESSAGE if lparam.0 as u32 == WM_RBUTTONUP => {
-            if let Ok(menu) = unsafe { CreatePopupMenu() } {
-                unsafe {
-                    let _ = AppendMenuW(menu, MF_STRING, EXIT_ID, w!("Exit Layout Fixer"));
-                    let mut point = POINT::default();
-                    if GetCursorPos(&mut point).is_ok() {
-                        let _ = SetForegroundWindow(hwnd);
-                        let _ = TrackPopupMenu(
-                            menu,
-                            TPM_RIGHTBUTTON,
-                            point.x,
-                            point.y,
-                            None,
-                            hwnd,
-                            None,
-                        );
-                    }
-                    let _ = DestroyMenu(menu);
-                }
-            }
+        TRAY_MESSAGE if matches!(lparam.0 as u32, WM_RBUTTONUP | WM_LBUTTONUP) => {
+            show_menu(hwnd);
             LRESULT(0)
         }
         WM_COMMAND if wparam.0 & 0xffff == EXIT_ID => {
             unsafe {
                 let _ = DestroyWindow(hwnd);
             }
+            LRESULT(0)
+        }
+        WM_COMMAND if wparam.0 & 0xffff == UNINSTALL_ID => {
+            start_uninstall(hwnd);
             LRESULT(0)
         }
         WM_DESTROY => {

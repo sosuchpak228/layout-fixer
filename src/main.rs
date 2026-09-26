@@ -398,7 +398,7 @@ fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--help" || a == "-h") {
         println!(
-            "Layout Fixer 0.1.0-preview.5\n  (no arguments)       Listen on Ctrl+Alt+L in the tray; preserve letter case\n  --hotkey COMBINATION Use a custom shortcut, e.g. --hotkey Ctrl+Alt+A\n  --test-hotkey         Alias for --hotkey Ctrl+Alt+F12\n  --lowercase           Convert all output to lowercase\n  --diagnostics         Print focused control metadata after a skipped shortcut\n  --help                Show this message\nSupported keys: A-Z, 0-9, F1-F24. Include Ctrl, Alt, Shift, or Win."
+            "Layout Fixer 0.1.0-preview.6\n  (no arguments)       Listen on Ctrl+Alt+L in the tray; preserve letter case\n  --hotkey COMBINATION Use a custom shortcut, e.g. --hotkey Ctrl+Alt+A\n  --test-hotkey         Alias for --hotkey Ctrl+Alt+F12\n  --lowercase           Convert all output to lowercase\n  --diagnostics         Print focused control metadata after a skipped shortcut\n  --help                Show this message\nSupported keys: A-Z, 0-9, F1-F24. Include Ctrl, Alt, Shift, or Win."
         );
         return;
     }
