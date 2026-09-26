@@ -12,9 +12,9 @@ use windows::Win32::{
     },
     UI::{
         Accessibility::{
-            CUIAutomation, IUIAutomation, IUIAutomationElement, IUIAutomationTextPattern,
-            IUIAutomationValuePattern, UIA_EditControlTypeId, UIA_TextPatternId,
-            UIA_ValuePatternId,
+            CUIAutomation, IUIAutomation, IUIAutomationElement, IUIAutomationTextEditPattern,
+            IUIAutomationTextPattern, IUIAutomationValuePattern, UIA_EditControlTypeId,
+            UIA_TextEditPatternId, UIA_TextPatternId, UIA_ValuePatternId,
         },
         Controls::EM_GETSEL,
         Input::KeyboardAndMouse::{
@@ -34,6 +34,22 @@ use windows::core::{HSTRING, w};
 
 const MAX_SELECTION: i32 = 16_384;
 const HOTKEY_ID: i32 = 0x4c46;
+
+struct SelectedText {
+    text: String,
+    method: &'static str,
+    focused: IUIAutomationElement,
+}
+
+fn accepts_editor(
+    is_standard_edit: bool,
+    writable_value: Option<bool>,
+    text_edit: bool,
+    keyboard_focusable: bool,
+) -> bool {
+    writable_value != Some(false)
+        && (is_standard_edit || (keyboard_focusable && (writable_value == Some(true) || text_edit)))
+}
 
 fn message(hwnd: HWND, code: u32, wparam: usize, lparam: isize) -> Result<usize, String> {
     let mut result = 0usize;
@@ -110,10 +126,7 @@ fn standard_edit_selection(
         .map_err(|_| "editor selection contains invalid UTF-16".to_string())
 }
 
-fn selection(
-    ui: &IUIAutomation,
-    foreground: HWND,
-) -> Result<Option<(String, &'static str)>, String> {
+fn selection(ui: &IUIAutomation, foreground: HWND) -> Result<Option<SelectedText>, String> {
     // UIA only reads the active element; it never alters the global clipboard.
     let focused = unsafe { ui.GetFocusedElement() }.map_err(|e| format!("focused element: {e}"))?;
     if unsafe { focused.CurrentIsPassword() }
@@ -122,25 +135,60 @@ fn selection(
     {
         return Ok(None);
     }
-    if unsafe { focused.CurrentControlType() }.map_err(|e| format!("editor type: {e}"))?
-        != UIA_EditControlTypeId
+    if !unsafe { focused.CurrentIsEnabled() }
+        .map_err(|e| format!("editor enabled state: {e}"))?
+        .as_bool()
     {
         return Ok(None);
     }
-    if let Ok(value) =
+    let is_standard_edit = unsafe { focused.CurrentControlType() }
+        .map_err(|e| format!("editor type: {e}"))?
+        == UIA_EditControlTypeId;
+    let writable_value = if let Ok(value) =
         unsafe { focused.GetCurrentPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId) }
-        && unsafe { value.CurrentIsReadOnly() }
-            .map(|v| v.as_bool())
-            .unwrap_or(true)
     {
+        Some(
+            !unsafe { value.CurrentIsReadOnly() }
+                .map_err(|e| format!("editor read-only state: {e}"))?
+                .as_bool(),
+        )
+    } else {
+        None
+    };
+    let (text_edit, keyboard_focusable) = if is_standard_edit {
+        (false, true)
+    } else {
+        let text_edit = unsafe {
+            focused.GetCurrentPatternAs::<IUIAutomationTextEditPattern>(UIA_TextEditPatternId)
+        }
+        .is_ok();
+        let keyboard_focusable = unsafe { focused.CurrentIsKeyboardFocusable() }
+            .map_err(|e| format!("editor focus state: {e}"))?
+            .as_bool();
+        (text_edit, keyboard_focusable)
+    };
+    if !accepts_editor(
+        is_standard_edit,
+        writable_value,
+        text_edit,
+        keyboard_focusable,
+    ) {
         return Ok(None);
     }
     let pattern: IUIAutomationTextPattern =
         match unsafe { focused.GetCurrentPatternAs(UIA_TextPatternId) } {
             Ok(pattern) => pattern,
             Err(_) => {
-                return standard_edit_selection(&focused, foreground)
-                    .map(|selected| selected.map(|text| (text, "Win32 Edit")));
+                if !is_standard_edit {
+                    return Ok(None);
+                }
+                return standard_edit_selection(&focused, foreground).map(|selected| {
+                    selected.map(|text| SelectedText {
+                        text,
+                        method: "Win32 Edit",
+                        focused,
+                    })
+                });
             }
         };
     let ranges = unsafe { pattern.GetSelection() }.map_err(|e| format!("selection: {e}"))?;
@@ -154,7 +202,44 @@ fn selection(
     if value.is_empty() || value.encode_utf16().count() > MAX_SELECTION as usize {
         return Ok(None);
     }
-    Ok(Some((value, "UI Automation")))
+    Ok(Some(SelectedText {
+        text: value,
+        method: "UI Automation",
+        focused,
+    }))
+}
+
+fn focus_probe(ui: &IUIAutomation) -> String {
+    let Ok(focused) = (unsafe { ui.GetFocusedElement() }) else {
+        return "focused element unavailable".to_string();
+    };
+    let control_type = unsafe { focused.CurrentControlType() }
+        .map(|value| value.0.to_string())
+        .unwrap_or_else(|_| "unknown".to_string());
+    let value =
+        unsafe { focused.GetCurrentPatternAs::<IUIAutomationValuePattern>(UIA_ValuePatternId) }
+            .ok();
+    let writable_value = value.as_ref().and_then(|pattern| {
+        unsafe { pattern.CurrentIsReadOnly() }
+            .ok()
+            .map(|read_only| !read_only.as_bool())
+    });
+    let text_pattern =
+        unsafe { focused.GetCurrentPatternAs::<IUIAutomationTextPattern>(UIA_TextPatternId) }
+            .is_ok();
+    let text_edit = unsafe {
+        focused.GetCurrentPatternAs::<IUIAutomationTextEditPattern>(UIA_TextEditPatternId)
+    }
+    .is_ok();
+    let password = unsafe { focused.CurrentIsPassword() }
+        .map(|value| value.as_bool())
+        .ok();
+    let focusable = unsafe { focused.CurrentIsKeyboardFocusable() }
+        .map(|value| value.as_bool())
+        .ok();
+    format!(
+        "control_type={control_type} writable_value={writable_value:?} text_pattern={text_pattern} text_edit={text_edit} password={password:?} focusable={focusable:?}"
+    )
 }
 
 fn modifiers_released() -> bool {
@@ -217,19 +302,30 @@ fn on_hotkey(ui: &IUIAutomation, lowercase: bool) -> Result<&'static str, String
     if !modifiers_released() {
         return Err("release the hotkey modifiers, then retry".to_string());
     }
-    let (source, method) = match selection(ui, foreground)? {
+    let selected = match selection(ui, foreground)? {
         Some(value) => value,
         None => return Ok("no supported selection; unchanged"),
     };
-    let replacement = convert(&source, Direction::Auto, lowercase);
-    if replacement == source {
+    let replacement = convert(&selected.text, Direction::Auto, lowercase);
+    if replacement == selected.text {
         return Ok("selection unchanged by mapping");
     }
     if unsafe { GetForegroundWindow() } != foreground {
         return Err("foreground changed; selection left untouched".to_string());
     }
+    let latest = unsafe { ui.GetFocusedElement() }.map_err(|e| format!("focused element: {e}"))?;
+    if !unsafe { ui.CompareElements(&selected.focused, &latest) }
+        .map_err(|e| format!("focused element comparison: {e}"))?
+        .as_bool()
+    {
+        return Err("editor focus changed; selection left untouched".to_string());
+    }
+    match selection(ui, foreground)? {
+        Some(current) if current.text == selected.text => {}
+        _ => return Err("selection changed; left untouched".to_string()),
+    }
     replace_selection(&replacement)?;
-    Ok(if method == "UI Automation" {
+    Ok(if selected.method == "UI Automation" {
         "converted via UI Automation; clipboard untouched"
     } else {
         "converted via Win32 Edit; clipboard untouched"
@@ -253,7 +349,7 @@ fn hotkey_modifiers(hotkey: &HotkeySpec) -> HOT_KEY_MODIFIERS {
     modifiers
 }
 
-fn run(hotkey: &HotkeySpec, lowercase: bool) -> Result<(), String> {
+fn run(hotkey: &HotkeySpec, lowercase: bool, diagnostics: bool) -> Result<(), String> {
     unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }
         .ok()
         .map_err(|e| format!("COM initialization: {e}"))?;
@@ -280,7 +376,12 @@ fn run(hotkey: &HotkeySpec, lowercase: bool) -> Result<(), String> {
         let mut msg = MSG::default();
         while unsafe { GetMessageW(&mut msg, None, 0, 0) }.as_bool() {
             if msg.message == WM_HOTKEY && msg.wParam.0 == HOTKEY_ID as usize {
-                match on_hotkey(&ui, lowercase) {
+                let result = on_hotkey(&ui, lowercase);
+                if diagnostics && !matches!(&result, Ok(status) if status.starts_with("converted"))
+                {
+                    eprintln!("Probe: {}", focus_probe(&ui));
+                }
+                match result {
                     Ok(status) => println!("{status}"),
                     Err(message) => eprintln!("Skipped: {message}"),
                 }
@@ -297,18 +398,20 @@ fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--help" || a == "-h") {
         println!(
-            "Layout Fixer 0.1.0-preview.4\n  (no arguments)       Listen on Ctrl+Alt+L in the tray; preserve letter case\n  --hotkey COMBINATION Use a custom shortcut, e.g. --hotkey Ctrl+Alt+A\n  --test-hotkey         Alias for --hotkey Ctrl+Alt+F12\n  --lowercase           Convert all output to lowercase\n  --help                Show this message\nSupported keys: A-Z, 0-9, F1-F24. Include Ctrl, Alt, Shift, or Win."
+            "Layout Fixer 0.1.0-preview.5\n  (no arguments)       Listen on Ctrl+Alt+L in the tray; preserve letter case\n  --hotkey COMBINATION Use a custom shortcut, e.g. --hotkey Ctrl+Alt+A\n  --test-hotkey         Alias for --hotkey Ctrl+Alt+F12\n  --lowercase           Convert all output to lowercase\n  --diagnostics         Print focused control metadata after a skipped shortcut\n  --help                Show this message\nSupported keys: A-Z, 0-9, F1-F24. Include Ctrl, Alt, Shift, or Win."
         );
         return;
     }
     let mut hotkey_value = None;
     let mut test_hotkey = false;
     let mut lowercase = false;
+    let mut diagnostics = false;
     let mut index = 0;
     while index < args.len() {
         match args[index].as_str() {
             "--test-hotkey" => test_hotkey = true,
             "--lowercase" => lowercase = true,
+            "--diagnostics" => diagnostics = true,
             "--hotkey" => {
                 if hotkey_value.is_some() {
                     show_startup_error("--hotkey may only be specified once");
@@ -338,7 +441,7 @@ fn main() {
         hotkey_value.as_deref().unwrap_or("Ctrl+Alt+L")
     };
     let hotkey = HotkeySpec::parse(hotkey_value).unwrap_or_else(|error| show_startup_error(&error));
-    if let Err(error) = run(&hotkey, lowercase) {
+    if let Err(error) = run(&hotkey, lowercase, diagnostics) {
         eprintln!("Layout Fixer: {error}");
         show_startup_error(&error);
     }
@@ -355,4 +458,20 @@ fn show_startup_error(error: &str) -> ! {
     }
     eprintln!("Layout Fixer: {error}");
     std::process::exit(2);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::accepts_editor;
+
+    #[test]
+    fn accepts_only_editable_browser_controls() {
+        assert!(accepts_editor(true, None, false, true));
+        assert!(accepts_editor(false, Some(true), false, true));
+        assert!(accepts_editor(false, None, true, true));
+        assert!(!accepts_editor(false, None, false, true));
+        assert!(!accepts_editor(false, Some(true), false, false));
+        assert!(!accepts_editor(false, Some(false), true, true));
+        assert!(!accepts_editor(true, Some(false), false, true));
+    }
 }

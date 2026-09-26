@@ -9,6 +9,7 @@ Input: one non-empty text selection in an editable window, followed by the regis
 - `RegisterHotKey`, not a global low-level keyboard hook: only one shortcut is observed, no background keystroke collection.
 - `--hotkey` accepts a constrained, auditable grammar: one or more of Ctrl/Alt/Shift/Win plus exactly one A-Z, 0-9, or F1-F24 key. Requiring a modifier prevents accidental capture of an ordinary typing key.
 - UI Automation `TextPattern.GetSelection` plus `TextRange.GetText`: reads supported editors without changing shared clipboard state.
+- Non-`Edit` controls are accepted only when focused, keyboard-focusable, and exposed as editable by a writable `ValuePattern` or `TextEditPattern`. The same selected text and focused element are checked again immediately before injection. This is a browser-editor experiment, not proof that every contenteditable implementation is compatible.
 - Narrow Win32 `Edit` fallback: `EM_GETSEL` and `WM_GETTEXT` with a 500 ms timeout, restricted to the focused child control of the foreground window. Classic Notepad does not expose UIA TextPattern on this host.
 - `SendInput` with `KEYEVENTF_UNICODE`: replaces the active selection without a paste operation. It is not guaranteed to work in every editor or across an elevated/secure desktop boundary.
 - No implicit Ctrl+C fallback: snapshotting arbitrary clipboard formats and restoring ownership correctly across Parsec, RDP, and clipboard history is not a reliable generic transaction. The old local PowerShell tool remains an explicit compatibility option, not part of this public binary.
@@ -26,8 +27,10 @@ No telemetry, network API, service, admin request, or persisted text. The proces
 - [x] Real standard Notepad Edit field: EN to RU and RU to EN with the alternate test hotkey, including the tray build.
 - [x] Existing Ctrl+Alt+L tool left running; no startup or VPN changes.
 - [ ] Manual app matrix: Chrome, Telegram, Unreal Editor, terminal, RDP/Parsec, elevated editor, clipboard-content preservation.
+- [ ] Real Yandex search and Magnific Canvas Space node tests with `--test-hotkey`; collect metadata-only diagnostics for skips.
+- [ ] Windows 11 x64 user validation; CI on Windows Server does not replace a desktop Windows 11 test.
 - [ ] Test tray menu and Explorer restart recovery on a separate release candidate.
-- [ ] Public GitHub release/tag only after the app matrix is recorded; until then, use a pre-release label.
+- [ ] Stable release only after the app matrix is recorded; use a pre-release label for unverified editor and OS combinations.
 
 ## Clipboard-manager direction
 

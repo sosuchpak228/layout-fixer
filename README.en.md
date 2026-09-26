@@ -2,11 +2,11 @@
 
 [Русская версия](README.md)
 
-[![Download for Windows x64](https://img.shields.io/badge/Download-Windows%20x64-0078D4?logo=windows)](https://github.com/sosuchpak228/layout-fixer/releases/download/v0.1.0-preview.4/layout-fixer.exe)
+[![Download for Windows x64](https://img.shields.io/badge/Download-Windows%20x64-0078D4?logo=windows)](https://github.com/sosuchpak228/layout-fixer/releases/download/v0.1.0-preview.5/layout-fixer.exe)
 
 A small, local Windows tool for correcting text typed in the wrong English/Russian keyboard layout. Select text and press **Ctrl+Alt+L**. For example, `ghbdtn` becomes `привет`, and `руддщ` becomes `hello`.
 
-This version **never copies selected text to the clipboard**. It reads the selection through Windows UI Automation or a standard Win32 `Edit` control, then replaces it with Unicode keyboard input. If an editor exposes neither interface, the tool leaves the text unchanged.
+This version **never copies selected text to the clipboard**. It reads the selection through Windows UI Automation or a standard Win32 `Edit` control, then replaces it with Unicode keyboard input. Preview.5 also tries focused browser editors that expose a writable UI Automation value or TextEdit pattern alongside a text selection. If an editor exposes neither interface, the tool leaves the text unchanged.
 
 ## Use
 
@@ -15,6 +15,8 @@ This version **never copies selected text to the clipboard**. It reads the selec
 3. Select text in an editable field and press **Ctrl+Alt+L**.
 
 This is a portable preview, not an installer. No administrator privileges, network connection, service, clipboard access, or automatic startup is required. Letter case is preserved by default: `Ghbdtn` becomes `Привет`, `GHBDTN` becomes `ПРИВЕТ`, and `HF,JNFTN` becomes `РАБОТАЕТ`. Use `--lowercase` only if you prefer the old all-lowercase behavior.
+
+The source is under the [MIT license](LICENSE), which is separate from executable signing. The EXE is not Authenticode-signed yet; signing requires a trusted publisher certificate and does not guarantee immediate SmartScreen reputation.
 
 To try it alongside another layout tool, run `layout-fixer.exe --test-hotkey` and use **Ctrl+Alt+F12**. The normal hotkey can only belong to one application at a time. The application does not silently stop or reconfigure other layout tools.
 
@@ -38,13 +40,19 @@ To start it on sign-in, first make sure it works in your editors, then place the
 
 ## Compatibility
 
-- Verified on Windows 10 with the classic Notepad `Edit` field in both directions.
-- UI Automation `TextPattern` works only in applications that expose an editable text selection through it. Chrome, Telegram, Unreal Editor, terminal emulators, and remote desktops are **not yet verified** for this new path.
+- Verified on Windows 10 with the classic Notepad `Edit` field in both directions. The same x64 EXE is intended for Windows 10 and 11, but real Windows 11 validation is pending.
+- UI Automation `TextPattern` works only in applications that expose an editable text selection through it. Browser search boxes and contenteditable nodes are experimental; Yandex and Magnific Canvas Space still need real-world confirmation. Telegram, Unreal Editor, terminal emulators, and remote desktops are **not yet verified** for this path.
 - Does not interact with password fields, read-only selections, unsupported/custom editor controls, elevated windows, protected desktops, or games that reject synthetic Unicode input. It intentionally has no clipboard fallback.
 - A foreground-window change or multiple/disappearing selections aborts replacement. Selection is capped at 16,384 UTF-16 units. Standard `Edit` fallback also requires the selection to end within the first 16,384 units of the control.
 - No selected text or clipboard content is saved to a log or sent over the network. The tray icon uses a stock Windows icon.
 
-If the hotkey does nothing in your editor, open an issue with the Windows version, app/version, whether the control is elevated, and reproduction steps. **Never include the selected text, screenshots of private content, or credentials.** This is an early public preview, not a universal replacement for every editor.
+For a skipped hotkey, run a second copy with `--test-hotkey --diagnostics` and test with **Ctrl+Alt+F12**. Redirect its output to files from PowerShell:
+
+```powershell
+Start-Process -FilePath .\layout-fixer.exe -ArgumentList '--test-hotkey', '--diagnostics' -RedirectStandardOutput "$env:TEMP\layout-fixer-test.out.log" -RedirectStandardError "$env:TEMP\layout-fixer-test.err.log"
+```
+
+Exit that copy through its tray icon after testing. The optional probe reports only control type, editability, supported UI Automation patterns, and skip reason; it does not log selected text. If the hotkey does nothing, open an issue with the Windows version, app/version, whether the control is elevated, and reproduction steps. **Never include selected text, screenshots of private content, or credentials.** This is an early public preview, not a universal replacement for every editor.
 
 ## Build
 
